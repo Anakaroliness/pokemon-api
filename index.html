@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Pokémon</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Pokémon</h1>
+            <p>Descubra informações sobre seus Pokémon favoritos!</p>
+        </header>
+        <main>
+            <div class="search-box">
+                <input type="text" id="pokemonSearch" placeholder="Digite o nome ou a habilidade do Pokémon">
+                <button id="searchButton">Pesquisar</button>
+            </div>
+            <p id="errorMessage" class="error"></p>
+            <div id="pokemonInfo" style="display: none;">
+                <div class="card">
+                    <img id="pokemonImage" alt="Imagem do Pokémon">
+                    <h2 id="pokemonName"></h2>
+                    <p><strong>ID:</strong> <span id="pokemonId"></span></p>
+                    <p><strong>Altura:</strong> <span id="pokemonHeight"></span></p>
+                    <p><strong>Peso:</strong> <span id="pokemonWeight"></span></p>
+                    <p><strong>Tipos:</strong> <span id="pokemonTypes"></span></p>
+                    <p><strong>Fraquezas:</strong> <span id="pokemonWeaknesses"></span></p>
+                </div>
+            </div>
+        </main>
+    </div>
+    <script>
+        const translations = {
+            fire: "Fogo",
+            water: "Água",
+            grass: "Grama",
+            electric: "Elétrico",
+            ground: "Terra",
+            rock: "Pedra",
+            flying: "Voador",
+            ice: "Gelo",
+            bug: "Inseto",
+            poison: "Veneno",
+            psychic: "Psíquico",
+            ghost: "Fantasma",
+            dragon: "Dragão",
+            dark: "Noturno",
+            steel: "Aço",
+            fairy: "Fada",
+            fighting: "Lutador",
+            normal: "Normal",
+            static: "Estático",
+            lightningrod: "Para-raios",
+            overgrow: "Supercrescimento",
+            blaze: "Chama",
+            torrent: "Torrente",
+            shielddust: "Pó de Escudo"
+        };
+
+        const abilityTranslations = Object.entries(translations).reduce((acc, [key, value]) => {
+            acc[value.toLowerCase()] = key; // Inverte o dicionário para busca em português
+            return acc;
+        }, {});
+
+        document.getElementById("searchButton").addEventListener("click", async () => {
+            const searchInput = document.getElementById("pokemonSearch").value.trim().toLowerCase();
+            const errorMessage = document.getElementById("errorMessage");
+            const pokemonInfo = document.getElementById("pokemonInfo");
+            const pokemonImage = document.getElementById("pokemonImage");
+            const pokemonName = document.getElementById("pokemonName");
+            const pokemonId = document.getElementById("pokemonId");
+            const pokemonHeight = document.getElementById("pokemonHeight");
+            const pokemonWeight = document.getElementById("pokemonWeight");
+            const pokemonTypes = document.getElementById("pokemonTypes");
+            const pokemonWeaknesses = document.getElementById("pokemonWeaknesses");
+
+            if (!searchInput) {
+                errorMessage.textContent = "Por favor, digite o nome ou a habilidade do Pokémon.";
+                pokemonInfo.style.display = "none";
+                return;
+            }
+
+            try {
+                let data;
+
+                // Tenta buscar por nome de Pokémon
+                try {
+                    const apiUrl = `https://pokeapi.co/api/v2/pokemon/${searchInput}`;
+                    const response = await fetch(apiUrl);
+                    if (!response.ok) throw new Error();
+                    data = await response.json();
+                } catch {
+                    // Caso falhe, tenta buscar por habilidade
+                    const translatedAbility = abilityTranslations[searchInput];
+                    if (!translatedAbility) throw new Error("Habilidade não encontrada em português.");
+
+                    const abilityUrl = `https://pokeapi.co/api/v2/ability/${translatedAbility}`;
+                    const abilityResponse = await fetch(abilityUrl);
+                    if (!abilityResponse.ok) throw new Error("Nenhum Pokémon encontrado com essa habilidade.");
+                    const abilityData = await abilityResponse.json();
+                    if (abilityData.pokemon.length === 0) throw new Error("Nenhum Pokémon encontrado com essa habilidade.");
+                    const firstPokemon = abilityData.pokemon[0].pokemon;
+                    const firstPokemonResponse = await fetch(firstPokemon.url);
+                    if (!firstPokemonResponse.ok) throw new Error();
+                    data = await firstPokemonResponse.json();
+                }
+
+                // Tradução dos tipos
+                const translatedTypes = data.types.map(t => translations[t.type.name] || t.type.name).join(", ");
+
+                // Atualiza os elementos com as informações do Pokémon
+                pokemonImage.src = data.sprites.front_default;
+                pokemonName.textContent = data.name.charAt(0).toUpperCase() + data.name.slice(1);
+                pokemonId.textContent = data.id;
+                pokemonHeight.textContent = `${data.height / 10} metros`;
+                pokemonWeight.textContent = `${data.weight / 10} kg`;
+                pokemonTypes.textContent = translatedTypes;
+                pokemonWeaknesses.textContent = calculateWeaknesses(data.types);
+
+                pokemonInfo.style.display = "block";
+                errorMessage.textContent = "";
+            } catch (error) {
+                errorMessage.textContent = error.message || "Pokémon não encontrado!";
+                pokemonInfo.style.display = "none";
+            }
+        });
+
+        function calculateWeaknesses(types) {
+            const typeWeaknesses = {
+                fire: ["water", "rock", "ground"],
+                water: ["electric", "grass"],
+                grass: ["fire", "flying", "ice"],
+                electric: ["ground"],
+                ground: ["water", "grass", "ice"]
+            };
+
+            const weaknesses = new Set();
+            types.forEach(type => {
+                const typeName = type.type.name;
+                if (typeWeaknesses[typeName]) {
+                    typeWeaknesses[typeName].forEach(weakness => weaknesses.add(translations[weakness] || weakness));
+                }
+            });
+
+            return Array.from(weaknesses).join(", ");
+        }
+    </script>
+</body>
+</html>
